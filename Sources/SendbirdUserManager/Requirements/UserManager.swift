@@ -21,7 +21,7 @@ public protocol SBUserManager {
     /// - Parameters:
     ///    - applicationId: Sendbird의 Application ID
     ///    - apiToken: 해당 Application에서 발급된 API Token
-    func initApplication(applicationId: String, apiToken: String)
+    func initApplication(applicationId: String, apiToken: String) async throws
     
     /// UserCreationParams를 사용하여 새로운 유저를 생성합니다.
     /// Profile URL은 임의의 image URL을 사용하시면 됩니다
@@ -29,7 +29,7 @@ public protocol SBUserManager {
     /// - Parameters:
     ///    - params: User를 생성하기 위한 값들의 struct
     ///    - completionHandler: 생성이 완료된 뒤, user객체와 에러 여부를 담은 completion Handler
-    func createUser(params: UserCreationParams, completionHandler: ((UserResult) -> Void)?)
+    func createUser(params: UserCreationParams) async throws -> SBUser
     
     /// UserCreationParams List를 사용하여 새로운 유저들을 생성합니다.
     /// 한 번에 생성할 수 있는 사용자의 최대 수는 10명로 제한해야 합니다
@@ -38,19 +38,19 @@ public protocol SBUserManager {
     /// - Parameters:
     ///    - params: User를 생성하기 위한 값들의 struct
     ///    - completionHandler: 생성이 완료된 뒤, user객체와 에러 여부를 담은 completion Handler
-    func createUsers(params: [UserCreationParams], completionHandler: ((UsersResult) -> Void)?)
+    func createUsers(params: [UserCreationParams]) async throws -> [SBUser]
     
     /// 특정 User의 nickname 또는 profileURL을 업데이트합니다
     /// 업데이트 요청이 성공한 뒤에 캐시에 upsert 되어야 합니다 
-    func updateUser(params: UserUpdateParams, completionHandler: ((UserResult) -> Void)?)
+    func updateUser(params: UserUpdateParams) async throws -> SBUser
     
     /// userId를 통해 특정 User의 정보를 가져옵니다
     /// 캐시에 해당 User가 있으면 캐시된 User를 반환합니다
     /// 캐시에 해당 User가 없으면 /GET API 호출하고 캐시에 저장합니다
-    func getUser(userId: String, completionHandler: ((UserResult) -> Void)?)
+    func getUser(userId: String) async throws -> SBUser
     
     /// Nickname을 필터로 사용하여 해당 nickname을 가진 User 목록을 가져옵니다
     /// GET API를 호출하고 캐시에 저장합니다
     /// Get users API를 활용할 때 limit은 100으로 고정합니다
-    func getUsers(nicknameMatches: String, completionHandler: ((UsersResult) -> Void)?)
+    func getUsers(nicknameMatches: String)  async throws -> [SBUser]
 }

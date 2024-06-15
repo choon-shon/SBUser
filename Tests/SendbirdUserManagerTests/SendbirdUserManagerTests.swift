@@ -10,15 +10,15 @@ import XCTest
 
 final class UserManagerTests: UserManagerBaseTests {
     override func userManager() -> SBUserManager {
-        MockUserManager()
+        AssignmentUserManager()
     }
 }
 
-final class UserStorageTests: UserStorageBaseTests {
-    override func userStorage() -> SBUserStorage? {
-        MockUserStorage()
-    }
-}
+//final class UserStorageTests: UserStorageBaseTests {
+//    override func userStorage() -> SBUserStorage? {
+//        AssignmentUserStorage()
+//    }
+//}
 
 //final class NetworkClientTests: NetworkClientBaseTests {
 //    override func networkClient() -> SBNetworkClient? {

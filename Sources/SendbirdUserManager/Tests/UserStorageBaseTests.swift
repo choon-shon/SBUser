@@ -12,39 +12,43 @@ import XCTest
 /// 사용을 위해서는 해당 클래스를 상속받고,
 /// `open func userStorage() -> SBUserStorage?`를 override한뒤, 본인이 구현한 SBUserStorage의 인스턴스를 반환하도록 합니다.
 open class UserStorageBaseTests: XCTestCase {
-    open func userStorage() -> SBUserStorage? { nil }
+    open func userStorage() -> SBUserStorage? { AssignmentUserStorage() }
     
-    public func testSetUser() throws {
+    public func testSetUser() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         let user = SBUser(userId: "1")
-        storage.upsertUser(user)
+        await storage.upsertUser(user)
         
-        XCTAssert(storage.getUser(for: "1")?.userId == "1")
-        XCTAssert(storage.getUsers().first?.userId == "1")
+        let user1 = await storage.getUser(for: "1")
+        XCTAssert(user1?.userId == "1")
+        
+        
+        let users = await storage.getUsers()
+        XCTAssert(users.first?.userId == "1")
     }
     
     
-    public func testSetAndGetUser() throws {
+    public func testSetAndGetUser() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         let user = SBUser(userId: "1")
-        storage.upsertUser(user)
+        await storage.upsertUser(user)
         
-        let retrievedUser = storage.getUser(for: user.userId)
+        let retrievedUser = await storage.getUser(for: user.userId)
         XCTAssertEqual(user.nickname, retrievedUser?.nickname)
     }
     
-    public func testGetAllUsers() throws {
+    public func testGetAllUsers() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         let users = [SBUser(userId: "1"), SBUser(userId: "2")]
         
         for user in users {
-            storage.upsertUser(user)
+            await storage.upsertUser(user)
         }
         
-        let retrievedUsers = storage.getUsers()
+        let retrievedUsers = await storage.getUsers()
         XCTAssertEqual(users.count, retrievedUsers.count)
     }
     
@@ -61,14 +65,14 @@ open class UserStorageBaseTests: XCTestCase {
         
         queue1.async {
             for _ in 0..<1000 {
-                storage.upsertUser(user)
+                Task { await storage.upsertUser(user) }
             }
             expectation.fulfill()
         }
         
         queue2.async {
             for _ in 0..<1000 {
-                _ = storage.getUser(for: user.userId)
+                Task { _ = await storage.getUser(for: user.userId) }
             }
             expectation.fulfill()
         }
@@ -83,9 +87,9 @@ open class UserStorageBaseTests: XCTestCase {
         expectation.expectedFulfillmentCount = 10
         
         for i in 0..<10 {
-            DispatchQueue.global().async {
+            Task {
                 let user = SBUser(userId: "\(i)")
-                storage.upsertUser(user)
+                await storage.upsertUser(user)
                 expectation.fulfill()
             }
         }
@@ -93,23 +97,23 @@ open class UserStorageBaseTests: XCTestCase {
         waitForExpectations(timeout: 10, handler: nil)
     }
     
-    public func testConcurrentReads() throws {
+    public func testConcurrentReads() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         let user = SBUser(userId: "1")
-        storage.upsertUser(user)
+        await storage.upsertUser(user)
         
         let expectation = self.expectation(description: "Concurrent reads")
         expectation.expectedFulfillmentCount = 10
         
         for _ in 0..<10 {
-            DispatchQueue.global().async {
-                _ = storage.getUser(for: user.userId)
+            Task {
+                _ = await storage.getUser(for: user.userId)
                 expectation.fulfill()
             }
         }
         
-        waitForExpectations(timeout: 10, handler: nil)
+        await fulfillment(of: [expectation], timeout: 10, enforceOrder: false)
     }
     
     public func testMixedReadsAndWrites() throws {
@@ -119,14 +123,14 @@ open class UserStorageBaseTests: XCTestCase {
         expectation.expectedFulfillmentCount = 20
         
         for i in 0..<10 {
-            DispatchQueue.global().async {
+            Task {
                 let user = SBUser(userId: "\(i)")
-                storage.upsertUser(user)
+                await storage.upsertUser(user)
                 expectation.fulfill()
             }
             
-            DispatchQueue.global().async {
-                _ = storage.getUser(for: "\(i)")
+            Task {
+                _ = await storage.getUser(for: "\(i)")
                 expectation.fulfill()
             }
         }
@@ -139,48 +143,70 @@ open class UserStorageBaseTests: XCTestCase {
         
         let user = SBUser(userId: "1")
         
-        measure {
-            for _ in 0..<1_000 {
-                storage.upsertUser(user)
+        measure(metrics: [XCTClockMetric()]) {
+            let expectation = expectation(description: "Measure upsertUser() performance")
+            
+            for i in 0..<1_000 {
+                Task {
+                    await storage.upsertUser(user)
+                    if i == 999 {
+                        expectation.fulfill()
+                    }
+                }
             }
+            waitForExpectations(timeout: 10, handler: nil)
         }
     }
     
-    public func testPerformanceOfGetUser() throws {
+    public func testPerformanceOfGetUser() async throws {
         let storage = try XCTUnwrap(self.userStorage())
-        
         let user = SBUser(userId: "1")
-        storage.upsertUser(user)
         
-        measure {
-            for _ in 0..<1_000 {
-                _ = storage.getUser(for: user.userId)
+        await storage.upsertUser(user)
+        
+        measure(metrics: [XCTClockMetric()]) {
+            let expectation = expectation(description: "Measure getUser() performance")
+            
+            for i in 0..<1_000 {
+                Task {
+                    _ =  await storage.getUser(for: user.userId)
+                    if i == 999 {
+                        expectation.fulfill()
+                    }
+                }
             }
+            wait(for: [expectation], timeout: 10)
         }
     }
     
-    public func testPerformanceOfGetAllUsers() throws {
+    public func testPerformanceOfGetAllUsers() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         for i in 0..<1_000 {
             let user = SBUser(userId: "\(i)")
-            storage.upsertUser(user)
+            await storage.upsertUser(user)
         }
         
-        measure {
-            _ = storage.getUsers()
+        measure(metrics: [XCTClockMetric()]) {
+            let expectation = self.expectation(description: "Async function completes")
+            Task {
+                _ = await storage.getUsers()
+                expectation.fulfill()
+            }
+            
+            wait(for: [expectation], timeout: 10)
         }
     }
 
     
-    public func testStress() throws {
+    public func testStress() async throws {
         let storage = try XCTUnwrap(self.userStorage())
         
         let user = SBUser(userId: "1")
         
         for _ in 0..<10_000 {
-            storage.upsertUser(user)
-            _ = storage.getUser(for: user.userId)
+           await storage.upsertUser(user)
+            _ = await storage.getUser(for: user.userId)
         }
     }
     
@@ -193,17 +219,17 @@ open class UserStorageBaseTests: XCTestCase {
         for i in 0..<10 {
             let user = SBUser(userId: "\(i)")
             
-            DispatchQueue.global().async {
-                storage.upsertUser(user)
+            Task {
+                await storage.upsertUser(user)
                 expectation.fulfill()
             }
             
-            DispatchQueue.global().async {
+            Task {
                 // Here we will wait for a brief moment to let the setUser operation potentially finish.
                 // In real scenarios, this delay might not guarantee the order of operations, but for testing purposes it's useful.
                 usleep(1000)
                 
-                let retrievedUser = storage.getUser(for: "\(i)")
+                let retrievedUser = await storage.getUser(for: "\(i)")
                 XCTAssertEqual(user.userId, retrievedUser?.userId)
                 XCTAssertEqual(user.nickname, retrievedUser?.nickname)
                 
@@ -223,8 +249,8 @@ open class UserStorageBaseTests: XCTestCase {
         let users: [SBUser] = (0..<10).map { SBUser(userId: "\($0)") }
         
         for user in users {
-            DispatchQueue.global().async {
-                storage.upsertUser(user)
+            Task {
+                await storage.upsertUser(user)
                 setExpectation.fulfill()
             }
         }
@@ -232,8 +258,8 @@ open class UserStorageBaseTests: XCTestCase {
         waitForExpectations(timeout: 10, handler: nil)
         
         // Now that all set operations have been fulfilled, we retrieve them on a different thread
-        DispatchQueue.global().async {
-            let retrievedUsers = storage.getUsers()
+        Task {
+            let retrievedUsers = await storage.getUsers()
             
             XCTAssertEqual(users.count, retrievedUsers.count)
             

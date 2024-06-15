@@ -36,8 +36,25 @@ public struct SBUser {
         self.nickname = nickname
         self.profileURL = profileURL
     }
+    
+    init(_ model: SBUserResponse) {
+        self.userId = model.user_id
+        self.nickname = model.nickname
+        self.profileURL = model.profile_url
+    }
 
     public var userId: String
     public var nickname: String?
     public var profileURL: String?
 }
+
+struct SBUserResponse: Decodable {
+    public var user_id: String
+    public var nickname: String?
+    public var profile_url: String?
+}
+
+struct SBUsersResponse: Decodable {
+    let users: [SBUserResponse]?
+}
+
